@@ -54,7 +54,13 @@ export async function GET(req: NextRequest, { params }: { params: { courseId: st
 export async function PATCH(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['INSTRUCTOR', 'ADMIN'].includes(session.user.role)) {
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    })
+    if (!dbUser || !['INSTRUCTOR', 'ADMIN'].includes(dbUser.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -73,10 +79,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { courseId: 
 export async function DELETE(req: NextRequest, { params }: { params: { courseId: string } }) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || session.user.role !== 'ADMIN') {
+    if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    })
+    if (!dbUser || dbUser.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     await prisma.course.delete({ where: { id: params.courseId } })
     return NextResponse.json({ success: true })
   } catch (err) {

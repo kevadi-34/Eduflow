@@ -51,7 +51,16 @@ const createCourseSchema = z.object({
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session || !['INSTRUCTOR', 'ADMIN'].includes(session.user.role)) {
+    if (!session) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const dbUser = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    })
+
+    if (!dbUser || !['INSTRUCTOR', 'ADMIN'].includes(dbUser.role)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 

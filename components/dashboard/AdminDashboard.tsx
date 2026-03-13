@@ -20,7 +20,15 @@ export default function AdminDashboard() {
     )
   }
 
-  const { stats, recentUsers, topCourses, enrollmentTrend, wellbeingAvg } = data
+  const { stats, recentUsers, topCourses, enrollmentTrend, wellbeingAvg, error } = data
+
+if (error) {
+  return (
+    <div className="flex items-center justify-center h-64">
+      <p className="text-red-400">Error: {error}</p>
+    </div>
+  )
+}
 
   const statCards = [
     { label: 'Total Users', value: stats.totalUsers, icon: Users, color: 'text-primary-400', bg: 'bg-primary-500/10' },

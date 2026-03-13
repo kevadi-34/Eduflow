@@ -6,8 +6,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ─────────────────────────────────────────
@@ -26,15 +27,20 @@ model User {
   updatedAt     DateTime  @updatedAt
 
   // Relations
-  enrollments   Enrollment[]
-  progress      Progress[]
-  submissions   QuizSubmission[]
-  surveyResponses SurveyResponse[]
-  notifications Notification[]
-  wellbeingLogs WellbeingLog[]
-  forumPosts    ForumPost[]
-  forumReplies  ForumReply[]
-  achievements  UserAchievement[]
+  enrollments          Enrollment[]
+  progress             Progress[]
+  submissions          QuizSubmission[]
+  surveyResponses      SurveyResponse[]
+  notifications        Notification[]
+  wellbeingLogs        WellbeingLog[]
+  forumPosts           ForumPost[]
+  forumReplies         ForumReply[]
+  achievements         UserAchievement[]
+  assignmentsGiven     Assignment[]            @relation("AssignmentsGiven")
+  assignmentSubmissions AssignmentSubmission[] @relation("AssignmentSubmissions")
+  examsGiven           Exam[]                  @relation("ExamsGiven")
+  examAttempts         ExamAttempt[]           @relation("ExamAttempts")
+  courseInstructors    CourseInstructor[]      @relation("CourseInstructors")
 }
 
 enum Role {
@@ -54,7 +60,7 @@ model Course {
   thumbnail   String?
   category    String
   level       Level     @default(BEGINNER)
-  duration    Int       // in minutes
+  duration    Int
   isPublished Boolean   @default(false)
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -63,6 +69,9 @@ model Course {
   modules     Module[]
   enrollments Enrollment[]
   tags        CourseTag[]
+  assignments Assignment[]
+  exams       Exam[]
+  instructors CourseInstructor[]
 }
 
 enum Level {
@@ -86,9 +95,9 @@ model Module {
 model Lesson {
   id          String      @id @default(cuid())
   title       String
-  content     String      // Rich text / markdown
+  content     String
   videoUrl    String?
-  duration    Int?        // in minutes
+  duration    Int?
   order       Int
   type        LessonType  @default(TEXT)
   moduleId    String
@@ -111,7 +120,7 @@ model Resource {
   id        String   @id @default(cuid())
   title     String
   url       String
-  type      String   // pdf, link, doc, etc.
+  type      String
   lessonId  String
   lesson    Lesson   @relation(fields: [lessonId], references: [id], onDelete: Cascade)
 }
@@ -153,7 +162,7 @@ model Progress {
   user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
   completed   Boolean   @default(false)
-  timeSpent   Int       @default(0) // in seconds
+  timeSpent   Int       @default(0)
   completedAt DateTime?
   createdAt   DateTime  @default(now())
 
@@ -169,7 +178,7 @@ model Quiz {
   title       String
   lessonId    String
   lesson      Lesson    @relation(fields: [lessonId], references: [id], onDelete: Cascade)
-  passMark    Int       @default(60) // percentage
+  passMark    Int       @default(60)
   createdAt   DateTime  @default(now())
 
   questions   Question[]
@@ -199,14 +208,14 @@ model QuizSubmission {
   quizId    String
   user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   quiz      Quiz      @relation(fields: [quizId], references: [id], onDelete: Cascade)
-  score     Int       // percentage 0-100
-  answers   Json      // { questionId: optionId }
+  score     Int
+  answers   Json
   passed    Boolean
   createdAt DateTime  @default(now())
 }
 
 // ─────────────────────────────────────────
-// SURVEY (from your research - Chapter 3)
+// SURVEY
 // ─────────────────────────────────────────
 
 model Survey {
@@ -224,11 +233,11 @@ model SurveyQuestion {
   id        String       @id @default(cuid())
   text      String
   type      QuestionType @default(MULTIPLE_CHOICE)
-  options   String[]     // JSON array of options
+  options   String[]
   order     Int
   surveyId  String
   survey    Survey       @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  category  String?      // "academic_performance", "motivation", "wellbeing", "challenges"
+  category  String?
 }
 
 enum QuestionType {
@@ -244,29 +253,29 @@ model SurveyResponse {
   surveyId  String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   survey    Survey   @relation(fields: [surveyId], references: [id], onDelete: Cascade)
-  answers   Json     // { questionId: answer }
+  answers   Json
   createdAt DateTime @default(now())
 
   @@unique([userId, surveyId])
 }
 
 // ─────────────────────────────────────────
-// WELLBEING TRACKER (addresses mental health - Chapter 1 objective 4)
+// WELLBEING TRACKER
 // ─────────────────────────────────────────
 
 model WellbeingLog {
   id        String   @id @default(cuid())
   userId    String
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  mood      Int      // 1-5 scale
-  stress    Int      // 1-5 scale
-  energy    Int      // 1-5 scale
+  mood      Int
+  stress    Int
+  energy    Int
   note      String?
   createdAt DateTime @default(now())
 }
 
 // ─────────────────────────────────────────
-// FORUM (addresses limited interaction - Chapter 2.4)
+// FORUM
 // ─────────────────────────────────────────
 
 model ForumPost {
@@ -293,7 +302,7 @@ model ForumReply {
 }
 
 // ─────────────────────────────────────────
-// GAMIFICATION & ACHIEVEMENTS (addresses motivation - Chapter 2.4)
+// ACHIEVEMENTS
 // ─────────────────────────────────────────
 
 model Achievement {
@@ -301,7 +310,7 @@ model Achievement {
   name        String
   description String
   icon        String
-  condition   String            // e.g., "complete_5_lessons"
+  condition   String
   points      Int               @default(10)
 
   users       UserAchievement[]
@@ -328,7 +337,105 @@ model Notification {
   user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
   title     String
   message   String
-  type      String   // "course", "achievement", "reminder", "survey"
+  type      String
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+// ─────────────────────────────────────────
+// ASSIGNMENTS & EXAMS
+// ─────────────────────────────────────────
+
+model Assignment {
+  id           String               @id @default(cuid())
+  title        String
+  description  String?
+  type         AssignmentType       @default(ASSIGNMENT)
+  courseId     String
+  course       Course               @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId String
+  instructor   User                 @relation("AssignmentsGiven", fields: [instructorId], references: [id])
+  dueDate      DateTime
+  totalMarks   Int                  @default(100)
+  createdAt    DateTime             @default(now())
+
+  submissions  AssignmentSubmission[]
+}
+
+enum AssignmentType {
+  ASSIGNMENT
+  PROJECT
+  EXAM
+}
+
+model AssignmentSubmission {
+  id           String     @id @default(cuid())
+  assignmentId String
+  assignment   Assignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  studentId    String
+  student      User       @relation("AssignmentSubmissions", fields: [studentId], references: [id])
+  content      String
+  grade        Int?
+  feedback     String?
+  submittedAt  DateTime   @default(now())
+
+  @@unique([assignmentId, studentId])
+}
+
+model Exam {
+  id           String         @id @default(cuid())
+  title        String
+  description  String?
+  courseId     String
+  course       Course         @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId String
+  instructor   User           @relation("ExamsGiven", fields: [instructorId], references: [id])
+  duration     Int            @default(60)
+  totalMarks   Int            @default(100)
+  passMark     Int            @default(50)
+  isPublished  Boolean        @default(false)
+  startTime    DateTime
+  endTime      DateTime?
+  createdAt    DateTime       @default(now())
+
+  questions    ExamQuestion[]
+  attempts     ExamAttempt[]
+}
+
+model ExamQuestion {
+  id      String   @id @default(cuid())
+  examId  String
+  exam    Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  text    String
+  type    String   @default("MCQ")
+  options String[]
+  answer  String
+  marks   Int      @default(1)
+  order   Int      @default(0)
+}
+
+model ExamAttempt {
+  id          String    @id @default(cuid())
+  examId      String
+  exam        Exam      @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studentId   String
+  student     User      @relation("ExamAttempts", fields: [studentId], references: [id])
+  answers     Json      @default("{}")
+  score       Int?
+  passed      Boolean?
+  startedAt   DateTime  @default(now())
+  submittedAt DateTime?
+
+  @@unique([examId, studentId])
+}
+
+model CourseInstructor {
+  id           String   @id @default(cuid())
+  courseId     String
+  course       Course   @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  instructorId String
+  instructor   User     @relation("CourseInstructors", fields: [instructorId], references: [id])
+  assignedAt   DateTime @default(now())
+
+  @@unique([courseId, instructorId])
 }

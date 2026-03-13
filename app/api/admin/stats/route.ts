@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+    console.log('SESSION:', JSON.stringify(session))
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
     }
@@ -34,13 +35,17 @@ export async function GET(req: NextRequest) {
       }),
 
       // Most enrolled courses
-      prisma.course.findMany({
-        take: 5,
-        where: { isPublished: true },
-        include: { _count: { select: { enrollments: true } } },
-        orderBy: { enrollments: { _count: 'desc' } },
-        select: { id: true, title: true, category: true, _count: true },
-      }),
+  prisma.course.findMany({
+    take: 5,
+    where: { isPublished: true },
+    orderBy: { enrollments: { _count: 'desc' } },
+    select: {
+       id: true,
+       title: true,
+       category: true,
+       _count: { select: { enrollments: true } },
+      },
+    }),
 
       // Average wellbeing scores
       prisma.wellbeingLog.aggregate({

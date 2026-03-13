@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { redirect } from 'next/navigation'
 import StudentDashboard from '@/components/dashboard/StudentDashboard'
 import AdminDashboard from '@/components/dashboard/AdminDashboard'
+import InstructorDashboard from '@/components/dashboard/InstructorDashboard'
 
 export default async function DashboardPage() {
   const session = await getServerSession(authOptions)
@@ -11,6 +12,9 @@ export default async function DashboardPage() {
 
   if (session.user.role === 'ADMIN') {
     return <AdminDashboard />
+  }
+  if (session.user.role === 'INSTRUCTOR') {
+  return <InstructorDashboard user={session.user} />
   }
 
   // Fetch student data

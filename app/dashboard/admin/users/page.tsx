@@ -22,7 +22,7 @@ export default function AdminUsersPage() {
 
     const res = await fetch(`/api/admin/users?${params}`)
     const data = await res.json()
-    setUsers(data.users)
+    setUsers(Array.isArray(data.users) ? data.users : Array.isArray(data) ? data : [])
     setTotal(data.total)
     setTotalPages(data.totalPages)
     setLoading(false)

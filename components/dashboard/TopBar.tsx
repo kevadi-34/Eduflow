@@ -1,7 +1,7 @@
 'use client'
 
-import { useState } from 'react'
-import { Bell, Search, Menu } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { Bell, Search, Menu, CheckCheck, X } from 'lucide-react'
 import { getInitials } from '@/lib/utils'
 
 interface TopBarProps {
@@ -10,15 +10,81 @@ interface TopBarProps {
 
 export default function TopBar({ user }: TopBarProps) {
   const [notifOpen, setNotifOpen] = useState(false)
+  const [notifications, setNotifications] = useState<any[]>([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [loading, setLoading] = useState(false)
+  const panelRef = useRef<HTMLDivElement>(null)
+
+  const fetchNotifications = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch('/api/notifications')
+      const data = await res.json()
+      const notifs = Array.isArray(data) ? data : []
+      setNotifications(notifs)
+      setUnreadCount(notifs.filter((n: any) => !n.read).length)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const markAllRead = async () => {
+    await fetch('/api/notifications', { method: 'PATCH' })
+    setNotifications(prev => prev.map(n => ({ ...n, read: true })))
+    setUnreadCount(0)
+  }
+
+  const markOneRead = async (id: string) => {
+    await fetch('/api/notifications', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id }),
+    })
+    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))
+    setUnreadCount(prev => Math.max(0, prev - 1))
+  }
+
+  useEffect(() => {
+    fetchNotifications()
+    const interval = setInterval(fetchNotifications, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
+  // Close panel when clicking outside
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setNotifOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [])
+
+  const typeIcons: Record<string, string> = {
+    course: '📚',
+    achievement: '🏆',
+    reminder: '⏰',
+    survey: '📋',
+  }
+
+  const timeAgo = (date: string) => {
+    const diff = Date.now() - new Date(date).getTime()
+    const mins = Math.floor(diff / 60000)
+    const hours = Math.floor(diff / 3600000)
+    const days = Math.floor(diff / 86400000)
+    if (mins < 1) return 'Just now'
+    if (mins < 60) return `${mins}m ago`
+    if (hours < 24) return `${hours}h ago`
+    return `${days}d ago`
+  }
 
   return (
     <header className="h-16 bg-surface-900/80 border-b border-slate-800 backdrop-blur-sm sticky top-0 z-30 flex items-center px-6 gap-4">
-      {/* Mobile menu */}
       <button className="lg:hidden btn-ghost p-2">
         <Menu className="w-5 h-5" />
       </button>
 
-      {/* Search */}
       <div className="flex-1 max-w-sm hidden md:flex items-center gap-2 bg-slate-800/80 border border-slate-700 rounded-xl px-3 py-2">
         <Search className="w-4 h-4 text-slate-400 flex-shrink-0" />
         <input
@@ -30,19 +96,86 @@ export default function TopBar({ user }: TopBarProps) {
 
       <div className="flex-1" />
 
-      {/* Notifications */}
-      <div className="relative">
+      {/* Notifications Bell */}
+      <div className="relative" ref={panelRef}>
         <button
-          onClick={() => setNotifOpen(!notifOpen)}
+          onClick={() => { setNotifOpen(!notifOpen); if (!notifOpen) fetchNotifications() }}
           className="btn-ghost p-2 relative"
         >
           <Bell className="w-5 h-5" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary-500 rounded-full" />
+          {unreadCount > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 w-5 h-5 bg-red-500 rounded-full text-white text-xs font-bold flex items-center justify-center">
+              {unreadCount > 9 ? '9+' : unreadCount}
+            </span>
+          )}
         </button>
+
         {notifOpen && (
-          <div className="absolute right-0 top-12 w-80 card border-slate-700 shadow-2xl z-50 animate-slide-up">
-            <h3 className="font-semibold text-white text-sm mb-3">Notifications</h3>
-            <p className="text-slate-400 text-sm">Notifications load dynamically from the API.</p>
+          <div className="absolute right-0 top-12 w-96 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden">
+            {/* Header */}
+            <div className="flex items-center justify-between px-4 py-3 border-b border-slate-800">
+              <div className="flex items-center gap-2">
+                <h3 className="font-semibold text-white text-sm">Notifications</h3>
+                {unreadCount > 0 && (
+                  <span className="bg-red-500 text-white text-xs font-bold px-1.5 py-0.5 rounded-full">
+                    {unreadCount}
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-2">
+                {unreadCount > 0 && (
+                  <button
+                    onClick={markAllRead}
+                    className="text-xs text-primary-400 hover:text-primary-300 flex items-center gap-1"
+                  >
+                    <CheckCheck className="w-3.5 h-3.5" /> Mark all read
+                  </button>
+                )}
+                <button onClick={() => setNotifOpen(false)} className="text-slate-400 hover:text-white">
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+
+            {/* Notifications List */}
+            <div className="max-h-96 overflow-y-auto">
+              {loading ? (
+                <div className="flex justify-center py-8">
+                  <div className="w-5 h-5 border-2 border-primary-500 border-t-transparent rounded-full animate-spin" />
+                </div>
+              ) : notifications.length === 0 ? (
+                <div className="text-center py-12">
+                  <Bell className="w-10 h-10 text-slate-600 mx-auto mb-3" />
+                  <p className="text-slate-400 text-sm">No notifications yet</p>
+                </div>
+              ) : (
+                notifications.map(n => (
+                  <div
+                    key={n.id}
+                    onClick={() => !n.read && markOneRead(n.id)}
+                    className={`flex items-start gap-3 px-4 py-3 border-b border-slate-800/50 cursor-pointer transition-colors hover:bg-slate-800/40 ${
+                      !n.read ? 'bg-slate-800/20' : ''
+                    }`}
+                  >
+                    <span className="text-xl flex-shrink-0 mt-0.5">
+                      {typeIcons[n.type] || '🔔'}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className={`text-sm font-medium leading-snug ${n.read ? 'text-slate-300' : 'text-white'}`}>
+                          {n.title}
+                        </p>
+                        {!n.read && (
+                          <span className="w-2 h-2 bg-primary-500 rounded-full flex-shrink-0 mt-1.5" />
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{n.message}</p>
+                      <p className="text-xs text-slate-500 mt-1">{timeAgo(n.createdAt)}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         )}
       </div>
