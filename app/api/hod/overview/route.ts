@@ -12,10 +12,13 @@ export async function GET(req: NextRequest) {
       where: { id: session.user.id },
       select: { role: true },
     })
-    if (!dbUser || !['HOD', 'ADMIN'].includes(dbUser.role)) {
+    // Check if this user is assigned as HoD for any course
+    const hodAssignment = await prisma.courseHoD.findFirst({
+      where: { hodId: session.user.id },
+    })
+    if (!dbUser || (!hodAssignment && dbUser.role !== 'ADMIN')) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-
     // Get courses this HoD manages
     const hodCourses = await prisma.courseHoD.findMany({
       where: { hodId: session.user.id },

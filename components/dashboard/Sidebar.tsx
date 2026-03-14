@@ -6,17 +6,19 @@ import { cn } from '@/lib/utils'
 import {
   LayoutDashboard, BookOpen, TrendingUp, Heart, MessageSquare,
   Award, ClipboardList, Users, Settings, Zap, GraduationCap,
-  BarChart3, LogOut, CheckCircle, BookMarked
+  BarChart3, LogOut, CheckCircle, BookMarked, Plus
 } from 'lucide-react'
 import { signOut } from 'next-auth/react'
 
 const studentNav = [
   { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { href: '/dashboard/enroll', label: 'Enroll', icon: Plus },
   { href: '/dashboard/courses', label: 'My Courses', icon: BookOpen },
   { href: '/dashboard/units', label: 'Units', icon: BookMarked },
   { href: '/dashboard/assignments', label: 'Assignments', icon: ClipboardList },
   { href: '/dashboard/exams', label: 'Exams', icon: BarChart3 },
   { href: '/dashboard/progress', label: 'Progress', icon: TrendingUp },
+  { href: '/dashboard/progress/units', label: 'Unit Progress', icon: BarChart3 },
   { href: '/dashboard/wellbeing', label: 'Wellbeing', icon: Heart },
   { href: '/dashboard/forum', label: 'Forum', icon: MessageSquare },
   { href: '/dashboard/achievements', label: 'Achievements', icon: Award },
