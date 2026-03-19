@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+    console.log('SESSION:', JSON.stringify(session))
     if (!session || session.user.role !== 'ADMIN') {
       return NextResponse.json({ error: 'Admin access required.' }, { status: 403 })
     }
@@ -13,36 +14,40 @@ export async function GET(req: NextRequest) {
     const [
       totalUsers,
       totalStudents,
+      totalCourses,
       totalEnrollments,
       totalSurveyResponses,
-      totalCourses,
-      totalInstructors,
       recentUsers,
       topCourses,
       wellbeingAvg,
     ] = await Promise.all([
       prisma.user.count(),
       prisma.user.count({ where: { role: 'STUDENT' } }),
+      prisma.course.count({ where: { isPublished: true } }),
       prisma.enrollment.count(),
       prisma.surveyResponse.count(),
-      prisma.course.count(),
-      prisma.user.count({ where: { role: 'INSTRUCTOR' } }),
+
+      // Recent signups (last 7 days)
       prisma.user.findMany({
         take: 5,
         orderBy: { createdAt: 'desc' },
         select: { id: true, name: true, email: true, role: true, createdAt: true },
       }),
-      prisma.course.findMany({
-        take: 5,
-        where: { isPublished: true },
-        orderBy: { enrollments: { _count: 'desc' } },
-        select: {
-          id: true,
-          title: true,
-          category: true,
-          _count: { select: { enrollments: true } },
-        },
-      }),
+
+      // Most enrolled courses
+  prisma.course.findMany({
+    take: 5,
+    where: { isPublished: true },
+    orderBy: { enrollments: { _count: 'desc' } },
+    select: {
+       id: true,
+       title: true,
+       category: true,
+       _count: { select: { enrollments: true } },
+      },
+    }),
+
+      // Average wellbeing scores
       prisma.wellbeingLog.aggregate({
         _avg: { mood: true, stress: true, energy: true },
         where: {
@@ -51,6 +56,7 @@ export async function GET(req: NextRequest) {
       }),
     ])
 
+    // Enrollment trend (last 7 days)
     const enrollmentTrend = await Promise.all(
       Array.from({ length: 7 }).map(async (_, i) => {
         const date = new Date()
@@ -58,9 +64,11 @@ export async function GET(req: NextRequest) {
         date.setHours(0, 0, 0, 0)
         const nextDate = new Date(date)
         nextDate.setDate(nextDate.getDate() + 1)
+
         const count = await prisma.enrollment.count({
           where: { enrolledAt: { gte: date, lt: nextDate } },
         })
+
         return {
           date: date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),
           enrollments: count,
@@ -72,10 +80,9 @@ export async function GET(req: NextRequest) {
       stats: {
         totalUsers,
         totalStudents,
+        totalCourses,
         totalEnrollments,
         totalSurveyResponses,
-        totalCourses,
-        totalInstructors,
       },
       recentUsers,
       topCourses,
